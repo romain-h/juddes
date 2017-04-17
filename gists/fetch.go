@@ -57,34 +57,25 @@ func fetchGistPage(page int) ([]Gist, int) {
 func fetch() []Gist {
 	var allGists []Gist
 	var wg sync.WaitGroup
-	gists := make(chan []Gist)
-
-	go func() {
-		for res := range gists {
-			allGists = append(allGists, res...)
-		}
-	}()
 
 	firstPage, maxPage := fetchGistPage(1)
 	wg.Add(maxPage)
 
-	go func(res []Gist) {
-		defer wg.Done()
-		gists <- res
-	}(firstPage)
+	allGists = append(allGists, firstPage...)
+	wg.Done()
 
 	if maxPage > 2 {
 		for i := 2; i <= maxPage; i++ {
 			go func(page int) {
-				defer wg.Done()
 				res, _ := fetchGistPage(page)
-				gists <- res
+				allGists = append(allGists, res...)
+				wg.Done()
 			}(i)
 		}
 	}
 
 	wg.Wait()
-	fmt.Printf("Returning final res %v", len(allGists))
+	fmt.Printf("Returning final res %v\n", len(allGists))
 	return allGists
 }
 
