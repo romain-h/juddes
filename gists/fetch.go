@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/romain-h/juddes/models"
 )
@@ -85,6 +86,7 @@ func load(gists []Gist) {
 		log.Fatal(err)
 	}
 
+	currentTime := time.Now()
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatal(err)
@@ -92,16 +94,21 @@ func load(gists []Gist) {
 
 	for _, gist := range gists {
 		_, err := tx.Exec(`
-		INSERT INTO gists (id, url, description)
-		VALUES ($1, $2, $3)
+		INSERT INTO gists (id, url, description, created_at, updated_at, last_loaded_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (id) DO UPDATE
 		SET url = excluded.url,
-		description = excluded.description;
-		`, gist.ID, gist.URL, gist.Description)
+		description = excluded.description,
+		updated_at = excluded.updated_at,
+		last_loaded_at = excluded.last_loaded_at;
+		`, gist.ID, gist.URL, gist.Description, gist.CreatedAt, gist.UpdatedAt, currentTime)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	// Clean deleted gists
+	tx.Exec("DELETE FROM gists WHERE last_loaded_at < $1", currentTime)
 	tx.Commit()
 }
 

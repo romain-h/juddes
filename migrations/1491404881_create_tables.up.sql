@@ -1,7 +1,10 @@
 CREATE TABLE gists(
   id varchar(256) PRIMARY KEY,
   url varchar(2083),
-  description text
+  description text,
+  created_at timestamp NOT NULL,
+  updated_at timestamp NOT NULL,
+  last_loaded_at timestamp NOT NULL
 );
 
 CREATE TABLE files(

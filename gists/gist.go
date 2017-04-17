@@ -10,10 +10,11 @@ type File struct {
 }
 
 type Gist struct {
-	URL         string          `json:"url"`
-	ID          string          `json:"id"`
-	Description string          `json:"description"`
-	Files       map[string]File `json:"files"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	URL          string          `json:"url"`
+	ID           string          `json:"id"`
+	Description  string          `json:"description"`
+	Files        map[string]File `json:"files"`
+	CreatedAt    time.Time       `json:"created_at"`
+	UpdatedAt    time.Time       `json:"updated_at"`
+	LastLoadedAt time.Time
 }
