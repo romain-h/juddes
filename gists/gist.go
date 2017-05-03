@@ -3,10 +3,12 @@ package gists
 import "time"
 
 type File struct {
-	Filename string `json:"filename"`
-	Type     string `json:"type"`
-	Language string `json:"langugae"`
-	Raw_url  string `json:"raw_url"`
+	Filename  string `json:"filename"`
+	Type      string `json:"type"`
+	Language  string `json:"langugae"`
+	Raw_url   string `json:"raw_url"`
+	Truncated bool   `json:"truncated"`
+	Content   string `json:"content"`
 }
 
 type Gist struct {

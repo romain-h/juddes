@@ -16,6 +16,8 @@ import (
 )
 
 const MAX_PER_PAGE = 30
+const GITHUB_USER = "romain-h"
+const GITHUB_API = "https://api.github.com"
 
 func getMaxPage(res *http.Response) int {
 	link := res.Header.Get("Link")
@@ -27,15 +29,10 @@ func getMaxPage(res *http.Response) int {
 	return maxPage
 }
 
-func fetchGistPage(page int) ([]Gist, int) {
-	maxPage := 0
+func requestGithub(path string) *http.Response {
 	client := &http.Client{}
 
-	url := fmt.Sprintf(
-		"https://api.github.com/users/romain-h/gists?page=%v&per_page=%v",
-		page,
-		MAX_PER_PAGE,
-	)
+	url := fmt.Sprintf("%v%v", GITHUB_API, path)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", fmt.Sprintf("token %s", os.Getenv("GITHUB_TOKEN")))
 	res, err := client.Do(req)
@@ -43,6 +40,41 @@ func fetchGistPage(page int) ([]Gist, int) {
 		log.Fatal(err)
 	}
 
+	return res
+}
+
+func fullGist(gist *Gist) {
+	path := fmt.Sprintf("/gists/%v", gist.ID)
+	res := requestGithub(path)
+	defer res.Body.Close()
+
+	if err := json.NewDecoder(res.Body).Decode(&gist); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func addContent(gists *[]Gist) {
+	var wg sync.WaitGroup
+	wg.Add(len(*gists))
+
+	for _, gist := range *gists {
+		go func(g Gist) {
+			fullGist(&g)
+			wg.Done()
+		}(gist)
+	}
+}
+
+func fetchGistsPage(page int) ([]Gist, int) {
+	maxPage := 0
+	path := fmt.Sprintf(
+		"/users/%v/gists?page=%v&per_page=%v",
+		GITHUB_USER,
+		page,
+		MAX_PER_PAGE,
+	)
+
+	res := requestGithub(path)
 	defer res.Body.Close()
 	if page == 1 { // Only parse max page on first page
 		maxPage = getMaxPage(res)
@@ -59,7 +91,8 @@ func fetch() []Gist {
 	var allGists []Gist
 	var wg sync.WaitGroup
 
-	firstPage, maxPage := fetchGistPage(1)
+	firstPage, maxPage := fetchGistsPage(1)
+	addContent(&firstPage)
 	wg.Add(maxPage)
 
 	allGists = append(allGists, firstPage...)
@@ -68,8 +101,9 @@ func fetch() []Gist {
 	if maxPage > 2 {
 		for i := 2; i <= maxPage; i++ {
 			go func(page int) {
-				res, _ := fetchGistPage(page)
-				allGists = append(allGists, res...)
+				gists, _ := fetchGistsPage(page)
+				addContent(&gists)
+				allGists = append(allGists, gists...)
 				wg.Done()
 			}(i)
 		}
@@ -92,6 +126,7 @@ func load(gists []Gist) {
 		log.Fatal(err)
 	}
 
+	tx.Exec("TRUNCATE files;")
 	for _, gist := range gists {
 		_, err := tx.Exec(`
 		INSERT INTO gists (id, url, description, created_at, updated_at, last_loaded_at)
@@ -104,6 +139,16 @@ func load(gists []Gist) {
 		`, gist.ID, gist.URL, gist.Description, gist.CreatedAt, gist.UpdatedAt, currentTime)
 		if err != nil {
 			log.Fatal(err)
+		}
+
+		for _, file := range gist.Files {
+			_, err := tx.Exec(`
+			INSERT INTO files (filename, type, language, content, gist_id)
+			VALUES ($1, $2, $3, $4, $5);
+			`, file.Filename, file.Type, file.Language, file.Content, gist.ID)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 

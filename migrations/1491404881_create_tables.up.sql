@@ -11,6 +11,7 @@ CREATE TABLE files(
   filename text NOT NULL,
   type varchar(256),
   language varchar(256),
+  content text,
   gist_id varchar(256) NOT NULL references gists(id)
 );
 
