@@ -157,6 +157,38 @@ func load(gists []Gist) {
 	tx.Commit()
 }
 
+func Search(q string) []string {
+	var res []string
+	db, err := models.LoadDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	rows, err := db.Query(`
+	SELECT gid
+	FROM (SELECT gists.id as gid,
+		setweight(to_tsvector(gists.description), 'B') ||
+		setweight(to_tsvector(files.filename), 'A') ||
+		setweight(to_tsvector(files.content), 'C') as document
+	FROM gists
+	JOIN files ON files.gist_id = gists.id) p_search
+	WHERE p_search.document @@ to_tsquery($1)
+	ORDER BY ts_rank(p_search.document, to_tsquery($1)) DESC;
+	`, q)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		rows.Scan(&id)
+		res = append(res, id)
+	}
+
+	return res
+}
+
 func Sync() {
 	gists := fetch()
 	load(gists)

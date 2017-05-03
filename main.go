@@ -33,5 +33,10 @@ func main() {
 		gists.Sync()
 	})
 
+	authorized.GET("/search", func(c *gin.Context) {
+		res := gists.Search(c.Query("s"))
+		c.JSON(200, gin.H{"message": "ok", "data": res})
+	})
+
 	r.Run(":" + os.Getenv("PORT"))
 }
